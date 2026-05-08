@@ -630,6 +630,7 @@
     }
   </style>
 </head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <body>
 <div class="app">
 
@@ -680,23 +681,38 @@
 </div>
 
 <script>
+  /* ── CONFIG — paste your Supabase credentials here ───── */
+  const SUPABASE_URL  = 'https://vgdsgczezgiauysxggsy.supabase.co';
+  const SUPABASE_ANON = 'sb_publishable_qUmVo1-uOI5xMQg8mWHZWA_ArSIY81_';
+
+  /* ── SUPABASE ─────────────────────────────────────────── */
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
   /* ── STATE ───────────────────────────────────────────── */
-  let tasks  = JSON.parse(localStorage.getItem('tf_tasks')  || '[]');
+  let tasks  = [];
   let filter = localStorage.getItem('tf_filter') || 'all';
   let theme  = localStorage.getItem('tf_theme')  || 'midnight';
 
-  /* ── PERSIST ─────────────────────────────────────────── */
-  function save() {
-    localStorage.setItem('tf_tasks',  JSON.stringify(tasks));
+  /* ── PREFS (theme + filter only, not tasks) ──────────── */
+  function savePrefs() {
     localStorage.setItem('tf_filter', filter);
     localStorage.setItem('tf_theme',  theme);
   }
 
-  /* ── UTILS ───────────────────────────────────────────── */
-  function uid() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  /* ── DB ↔ APP MAPPING ────────────────────────────────── */
+  function fromDB(row) {
+    return {
+      id:       row.id,
+      title:    row.title,
+      dueDate:  row.due_date   || '',
+      priority: row.priority,
+      done:     row.completed,
+      notes:    row.notes      || '',
+      expanded: row.expanded   || false,
+    };
   }
 
+  /* ── UTILS ───────────────────────────────────────────── */
   function todayISO() {
     return new Date().toISOString().slice(0, 10);
   }
@@ -711,7 +727,7 @@
   function dateStatus(iso) {
     if (!iso) return 'none';
     const t = todayISO();
-    if (iso < t)  return 'over';
+    if (iso < t)   return 'over';
     if (iso === t) return 'today';
     return 'future';
   }
@@ -731,7 +747,7 @@
     document.querySelectorAll('.theme-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.t === t)
     );
-    save();
+    savePrefs();
   }
 
   document.getElementById('themeSwitcher').addEventListener('click', e => {
@@ -749,7 +765,7 @@
     document.querySelectorAll('.filter-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.f === filter)
     );
-    save();
+    savePrefs();
     render();
   });
 
@@ -757,25 +773,50 @@
     b.classList.toggle('active', b.dataset.f === filter)
   );
 
+  /* ── LOAD ────────────────────────────────────────────── */
+  async function loadTasks() {
+    document.getElementById('taskList').innerHTML =
+      '<div class="empty"><p>Loading…</p></div>';
+
+    const { data, error } = await db
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      document.getElementById('taskList').innerHTML =
+        `<div class="empty"><p>Could not load tasks: ${esc(error.message)}</p></div>`;
+      return;
+    }
+
+    tasks = (data || []).map(fromDB);
+    render();
+  }
+
   /* ── ADD ─────────────────────────────────────────────── */
-  function addTask() {
+  async function addTask() {
     const title = document.getElementById('taskInput').value.trim();
     if (!title) { document.getElementById('taskInput').focus(); return; }
 
-    tasks.unshift({
-      id:        uid(),
-      title,
-      dueDate:   document.getElementById('dateInput').value,
-      priority:  document.getElementById('priorityInput').value,
-      done:      false,
-      notes:     '',
-      expanded:  false,
-    });
+    const { data, error } = await db
+      .from('tasks')
+      .insert({
+        title,
+        due_date:  document.getElementById('dateInput').value || null,
+        priority:  document.getElementById('priorityInput').value,
+        completed: false,
+        notes:     '',
+        expanded:  false,
+      })
+      .select()
+      .single();
 
-    document.getElementById('taskInput').value    = '';
-    document.getElementById('dateInput').value    = '';
+    if (error) { alert('Failed to add task: ' + error.message); return; }
+
+    tasks.unshift(fromDB(data));
+    document.getElementById('taskInput').value     = '';
+    document.getElementById('dateInput').value     = '';
     document.getElementById('priorityInput').value = 'med';
-    save();
     render();
     document.getElementById('taskInput').focus();
   }
@@ -787,9 +828,9 @@
 
   /* ── RENDER ──────────────────────────────────────────── */
   function render() {
-    const total   = tasks.length;
-    const doneN   = tasks.filter(t => t.done).length;
-    const activeN = total - doneN;
+    const total    = tasks.length;
+    const doneN    = tasks.filter(t => t.done).length;
+    const activeN  = total - doneN;
     const overdueN = tasks.filter(t => !t.done && dateStatus(t.dueDate) === 'over').length;
 
     document.getElementById('stats').innerHTML =
@@ -818,6 +859,8 @@
 
     list.innerHTML = visible.map(taskHTML).join('');
 
+    const noteTimers = {};
+
     visible.forEach(task => {
       const card = document.getElementById('tc-' + task.id);
       if (!card) return;
@@ -830,7 +873,13 @@
       if (ta) {
         ta.addEventListener('input', () => {
           const t = tasks.find(x => x.id === task.id);
-          if (t) { t.notes = ta.value; save(); updateNoteDot(task.id, ta.value); }
+          if (!t) return;
+          t.notes = ta.value;
+          updateNoteDot(task.id, ta.value);
+          clearTimeout(noteTimers[task.id]);
+          noteTimers[task.id] = setTimeout(() => {
+            db.from('tasks').update({ notes: ta.value }).eq('id', task.id);
+          }, 600);
         });
       }
     });
@@ -889,14 +938,27 @@
   }
 
   /* ── ACTIONS ─────────────────────────────────────────── */
-  function toggle(id, key) {
+  async function toggle(id, key) {
     const t = tasks.find(x => x.id === id);
-    if (t) { t[key] = !t[key]; save(); render(); }
+    if (!t) return;
+    t[key] = !t[key];
+    render();
+
+    const col = key === 'done' ? 'completed' : key;
+    const { error } = await db.from('tasks').update({ [col]: t[key] }).eq('id', id);
+    if (error) {
+      t[key] = !t[key];
+      render();
+      alert('Update failed: ' + error.message);
+    }
   }
 
-  function remove(id) {
+  async function remove(id) {
     tasks = tasks.filter(x => x.id !== id);
-    save(); render();
+    render();
+
+    const { error } = await db.from('tasks').delete().eq('id', id);
+    if (error) { alert('Delete failed: ' + error.message); await loadTasks(); }
   }
 
   function updateNoteDot(id, val) {
@@ -914,7 +976,7 @@
   }
 
   /* ── INIT ────────────────────────────────────────────── */
-  render();
+  loadTasks();
 </script>
 </body>
 </html>
