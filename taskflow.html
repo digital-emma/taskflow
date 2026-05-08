@@ -599,6 +599,31 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+    /* ── FEEDBACK BUTTON ────────────────────────────────── */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .feedback-btn {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      transition: color .2s, border-color .2s, background .2s;
+      white-space: nowrap;
+    }
+
+    .feedback-btn:hover {
+      color: var(--text);
+      background: var(--surface);
+      border-color: var(--accent);
+    }
+
     @media (max-width: 480px) {
       .meta-row  { gap: 6px; }
       .add-btn   { width: 100%; margin-left: 0; }
@@ -617,12 +642,15 @@
       </div>
       <h1>TaskFlow</h1>
     </div>
-    <div class="theme-switcher" id="themeSwitcher">
-      <button class="theme-btn active" data-t="midnight" title="Midnight"></button>
-      <button class="theme-btn"        data-t="sakura"   title="Sakura"></button>
-      <button class="theme-btn"        data-t="ocean"    title="Ocean"></button>
-      <button class="theme-btn"        data-t="neon"     title="Neon"></button>
-      <button class="theme-btn"        data-t="forest"   title="Forest"></button>
+    <div class="header-right">
+      <a href="mailto:emmaloukarin@gmail.com?subject=TaskFlow%20Feedback" class="feedback-btn">Feedback</a>
+      <div class="theme-switcher" id="themeSwitcher">
+        <button class="theme-btn active" data-t="midnight" title="Midnight"></button>
+        <button class="theme-btn"        data-t="sakura"   title="Sakura"></button>
+        <button class="theme-btn"        data-t="ocean"    title="Ocean"></button>
+        <button class="theme-btn"        data-t="neon"     title="Neon"></button>
+        <button class="theme-btn"        data-t="forest"   title="Forest"></button>
+      </div>
     </div>
   </header>
 
