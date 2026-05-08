@@ -16,8 +16,10 @@ Everything lives in `taskflow.html`, organized into three sections:
 
 **JavaScript (lines 654–890):** Plain vanilla JS, no framework.
 - State: `tasks` (array), `filter` (string), `theme` (string) — all persisted to `localStorage` under keys `tf_tasks`, `tf_filter`, `tf_theme`.
-- `render()` rebuilds `#taskList` and `#stats` from scratch on every state change using `taskHTML()` for each task, then re-attaches event listeners. There is no virtual DOM or diffing.
+- Task object shape: `{ id: string, title: string, dueDate: string (YYYY-MM-DD or ''), priority: 'low'|'med'|'high', done: boolean, notes: string, expanded: boolean }`. `expanded` is persisted, so notes panels reopen on page reload.
+- `render()` rebuilds `#taskList` and `#stats` from scratch on every state change using `taskHTML()` for each task, then re-attaches event listeners. There is no virtual DOM or diffing. **Any new interactive element inside a task card must have its listener wired inside `render()` after the innerHTML is set** — there is no event delegation.
 - `toggle(id, key)` flips a boolean field on a task (used for both `done` and `expanded`).
 - Notes are saved on `textarea` `input` events without debouncing; `updateNoteDot()` updates the indicator dot in-place without a full re-render.
+- The notes panel expand/collapse is a CSS `max-height` transition (0 ↔ 220px) driven by toggling the `.open` class — no JS animation.
 - Date comparison uses ISO string lexicographic ordering (`iso < todayISO()`), which works correctly for `YYYY-MM-DD` format.
 - `esc()` is the only XSS guard — all user-supplied strings rendered into innerHTML must go through it.
