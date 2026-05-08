@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-TaskFlow is a single-file, zero-dependency task manager (`taskflow.html`). Open it directly in any browser — there is no build step, server, package manager, or test suite.
+TaskFlow is a single-file, zero-dependency task manager (`index.html`). Open it directly in any browser — there is no build step, server, package manager, or test suite.
 
 ## Architecture
 
-Everything lives in `taskflow.html`, organized into three sections:
+Everything lives in `index.html`, organized into three sections:
 
 **CSS (lines 7–606):** Theme variables are declared as CSS custom properties on `[data-theme="<name>"]` attribute selectors on `<html>`. Themes: `midnight`, `sakura`, `ocean`, `neon`, `forest`. Neon and Forest override component styles (`.add-btn`, `.chk.on`, etc.) with theme-specific rules below the base variables. All colors reference `var(--*)` tokens — add a new theme by adding a new `[data-theme]` block.
 
