@@ -46,7 +46,7 @@ export default async function handler(req, res) {
 
   const parts = [`*${title}*`];
   if (due_date) parts.push(`due ${due_date}`);
-  parts.push(`priority: ${priority}`);
+  if (priority) parts.push(`priority: ${priority}`);
 
   return res.status(200).json({
     response_type: 'in_channel',
@@ -67,8 +67,8 @@ async function insertTask({ title, due_date, priority }) {
     },
     body: JSON.stringify({
       title,
-      due_date:  due_date || null,
-      priority,
+      ...(due_date  && { due_date }),
+      ...(priority  && { priority }),
       completed: false,
       notes:     '',
       expanded:  false,
@@ -126,7 +126,7 @@ function parseText(text) {
   const priMatch = text.match(/\bpriority:(low|med|medium|high)\b/i);
 
   const due_date = dueMatch ? dueMatch[1] : null;
-  let priority = 'med';
+  let priority = null;
   if (priMatch) {
     const p = priMatch[1].toLowerCase();
     priority = p === 'medium' ? 'med' : p;
