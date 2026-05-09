@@ -594,6 +594,35 @@
     .notes-ta:focus   { border-color: var(--accent); }
     .notes-ta::placeholder { color: var(--faint); }
 
+    /* ── INLINE EDIT ────────────────────────────────────── */
+    .inline-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 11px;
+      color: var(--text);
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .inline-input:focus { border-color: var(--accent); }
+    .inline-input::placeholder { color: var(--faint); }
+
+    .edit-meta {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .edit-meta select,
+    .edit-meta input[type="date"] { background: var(--surface); }
+
+    .icon-btn.save-btn:hover { background: var(--low-bg); color: var(--low); }
+
     /* ── SCROLLBAR ──────────────────────────────────────── */
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -681,6 +710,7 @@
       done:     row.completed,
       notes:    row.notes      || '',
       expanded: row.expanded   || false,
+      editing:  false,
     };
   }
 
@@ -837,9 +867,19 @@
       const card = document.getElementById('tc-' + task.id);
       if (!card) return;
 
-      card.querySelector('.chk').addEventListener('click', () => toggle(task.id, 'done'));
-      card.querySelector('.exp-btn').addEventListener('click', () => toggle(task.id, 'expanded'));
-      card.querySelector('.del-btn').addEventListener('click', () => remove(task.id));
+      if (task.editing) {
+        card.querySelector('.save-btn').addEventListener('click',   () => saveEdit(task.id));
+        card.querySelector('.cancel-btn').addEventListener('click', () => cancelEdit(task.id));
+        card.querySelector('.edit-title').addEventListener('keydown', e => {
+          if (e.key === 'Enter')  saveEdit(task.id);
+          if (e.key === 'Escape') cancelEdit(task.id);
+        });
+      } else {
+        card.querySelector('.chk').addEventListener('click',     () => toggle(task.id, 'done'));
+        card.querySelector('.exp-btn').addEventListener('click',  () => toggle(task.id, 'expanded'));
+        card.querySelector('.edit-btn').addEventListener('click', () => editTask(task.id));
+        card.querySelector('.del-btn').addEventListener('click',  () => remove(task.id));
+      }
 
       const ta = card.querySelector('.notes-ta');
       if (ta) {
@@ -866,11 +906,52 @@
       dateBadge  = `<span class="badge ${cls}">📅 ${esc(fmtDate(task.dueDate))}${note}</span>`;
     }
 
-    const priBadge = `<span class="badge ${PRI_CLASS[task.priority]}">${PRI_ICON[task.priority]} ${PRI_LABEL[task.priority]}</span>`;
+    const p = task.priority;
+    const priBadge = p ? `<span class="badge ${PRI_CLASS[p]}">${PRI_ICON[p]} ${PRI_LABEL[p]}</span>` : '';
 
     const dot = task.notes.trim()
       ? `<span class="note-dot" title="Has notes"></span>`
       : '';
+
+    const notePanel = `
+  <div class="notes-panel${task.expanded ? ' open' : ''}">
+    <div class="notes-divider"></div>
+    <div class="notes-label">Notes</div>
+    <textarea class="notes-ta" placeholder="Add notes, details, or context…">${esc(task.notes)}</textarea>
+  </div>`;
+
+    if (task.editing) {
+      const priOpts = ['low', 'med', 'high'].map(v =>
+        `<option value="${v}"${(p || 'med') === v ? ' selected' : ''}>${PRI_ICON[v]} ${PRI_LABEL[v]} Priority</option>`
+      ).join('');
+
+      return `
+<div class="task-card${task.done ? ' done' : ''}" id="tc-${task.id}">
+  <div class="task-main">
+    <div class="chk${task.done ? ' on' : ''}" style="pointer-events:none;opacity:.45"></div>
+    <div class="task-body">
+      <input type="text" class="inline-input edit-title" value="${esc(task.title)}" placeholder="Task title" />
+      <div class="edit-meta">
+        <input type="date" class="date-input edit-date" value="${task.dueDate || ''}" />
+        <select class="priority-select edit-pri">${priOpts}</select>
+      </div>
+    </div>
+    <div class="task-actions">
+      <button class="icon-btn save-btn" title="Save changes">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </button>
+      <button class="icon-btn cancel-btn" title="Cancel">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  ${notePanel}
+</div>`;
+    }
 
     return `
 <div class="task-card${task.done ? ' done' : ''}" id="tc-${task.id}">
@@ -891,6 +972,12 @@
           <line x1="10" y1="9"  x2="8" y2="9"/>
         </svg>
       </button>
+      <button class="icon-btn edit-btn" title="Edit task">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
       <button class="icon-btn del-btn" title="Delete">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3,6 5,6 21,6"/>
@@ -901,11 +988,7 @@
       </button>
     </div>
   </div>
-  <div class="notes-panel${task.expanded ? ' open' : ''}">
-    <div class="notes-divider"></div>
-    <div class="notes-label">Notes</div>
-    <textarea class="notes-ta" placeholder="Add notes, details, or context…">${esc(task.notes)}</textarea>
-  </div>
+  ${notePanel}
 </div>`;
   }
 
@@ -945,6 +1028,52 @@
     } else if (!val.trim() && dot) {
       dot.remove();
     }
+  }
+
+  /* ── EDIT ───────────────────────────────────────────── */
+  function editTask(id) {
+    tasks.forEach(x => { x.editing = false; });
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+    t.editing = true;
+    render();
+    const card = document.getElementById('tc-' + id);
+    if (card) card.querySelector('.edit-title').focus();
+  }
+
+  async function saveEdit(id) {
+    const card = document.getElementById('tc-' + id);
+    if (!card) return;
+    const newTitle = card.querySelector('.edit-title').value.trim();
+    if (!newTitle) { card.querySelector('.edit-title').focus(); return; }
+    const newDate = card.querySelector('.edit-date').value || null;
+    const newPri  = card.querySelector('.edit-pri').value;
+
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+    const prev = { title: t.title, dueDate: t.dueDate, priority: t.priority };
+    t.title    = newTitle;
+    t.dueDate  = newDate || '';
+    t.priority = newPri;
+    t.editing  = false;
+    render();
+
+    const { error } = await db.from('tasks')
+      .update({ title: newTitle, due_date: newDate, priority: newPri })
+      .eq('id', id);
+    if (error) {
+      Object.assign(t, prev);
+      t.editing = false;
+      render();
+      alert('Update failed: ' + error.message);
+    }
+  }
+
+  function cancelEdit(id) {
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+    t.editing = false;
+    render();
   }
 
   /* ── INIT ────────────────────────────────────────────── */
